@@ -96,7 +96,7 @@ func (properties Properties) GetType() PropertyType {
 	if properties.Enum != nil {
 		return ENUM_TYPE
 	}
-	if properties.OneOf != nil {
+	if properties.AnyOf != nil {
 		return UNION_TYPE
 	}
 	if properties.Type == ARRAY {
@@ -193,7 +193,7 @@ func (properties Properties) ToField(root map[string]Properties, propertyName st
 		}
 	case UNION_TYPE:
 		{
-			return ToUnionProperty(root, propertyName, properties.OneOf, index, nestedObjectHander)
+			return ToUnionProperty(root, propertyName, properties.AnyOf, index, nestedObjectHander)
 		}
 	}
 	return "--Invalid Type--"
@@ -245,7 +245,7 @@ func (schema Schema) ToProtobuf(root map[string]Properties, nestedObjectHandler 
 		switch _type {
 		case ENUM_TYPE:
 			{
-				buffer.WriteString(ToEnum(key, value.Enum))
+				buffer.WriteString(ToEnum(key, value.Enum, duplicateCheck))
 			}
 		default:
 			{
@@ -263,11 +263,15 @@ _$VALUE$_
 }
 `
 
-func ToEnum(enumName string, enumValue []string) string {
+func ToEnum(enumName string, enumValue []string, duplicateCheck DuplicateCheck) string {
+	_enumName := toPascalCase(enumName)
+	if duplicateCheck(*_enumName) {
+		return ""
+	}
 	buffer := bytes.NewBufferString("")
 	for index, value := range enumValue {
 		buffer.WriteString("\t")
-		buffer.WriteString(value)
+		buffer.WriteString(*fixString(value))
 		buffer.WriteString(" ")
 		buffer.WriteString("=")
 		buffer.WriteString(" ")
@@ -275,7 +279,7 @@ func ToEnum(enumName string, enumValue []string) string {
 		buffer.WriteString(";\n")
 	}
 	renderedStr := ENUM_TEMPLATE
-	renderedStr = strings.Replace(renderedStr, "_$NAME$_", *toPascalCase(enumName), 1)
+	renderedStr = strings.Replace(renderedStr, "_$NAME$_", *_enumName, 1)
 	renderedStr = strings.Replace(renderedStr, "_$VALUE$_", buffer.String(), 1)
 	return renderedStr
 }
@@ -317,6 +321,11 @@ func ToPrimitiveProperty(propertyName string, typeName Types, index *int) string
 	case NUMBER:
 		{
 			_typename = "double"
+			break
+		}
+	case BOOLEAN:
+		{
+			_typename = "bool"
 			break
 		}
 	default:
@@ -410,6 +419,10 @@ syntax = "proto3";
 
 package _$PACKAGE$_;
 
+import "google/protobuf/any.proto";
+
+message null {}
+
 `
 
 func (rcvr DefaultJsonSchemaParser) Parse(packageName string) []string {
@@ -429,7 +442,7 @@ func (rcvr DefaultJsonSchemaParser) Parse(packageName string) []string {
 				continue
 			}
 			if _value, ok := value.([]string); ok {
-				values = append(values, ToEnum(key, _value))
+				values = append(values, ToEnum(key, _value, rcvr.duplicateCheck))
 				continue
 			}
 		}
@@ -441,7 +454,10 @@ func (rcvr DefaultJsonSchemaParser) Parse(packageName string) []string {
 }
 
 func fixString(str string) *string {
-	output := strings.ReplaceAll(str, "#", "_")
+	output := str
+	output = strings.ReplaceAll(output, "#", "_")
+	output = strings.ReplaceAll(output, " ", "_")
+	output = strings.ReplaceAll(output, "-", "_")
 	return &output
 }
 
