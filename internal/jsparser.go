@@ -271,8 +271,9 @@ func ToEnum(enumName string, enumValue []string, duplicateCheck DuplicateCheck) 
 	}
 	buffer := bytes.NewBufferString("")
 	for index, value := range enumValue {
+		fixedValue := *fixString(value)
 		buffer.WriteString("\t")
-		buffer.WriteString(*fixString(value))
+		buffer.WriteString(fmt.Sprintf("%s_%s", *_enumName, fixedValue))
 		buffer.WriteString(" ")
 		buffer.WriteString("=")
 		buffer.WriteString(" ")
@@ -331,7 +332,11 @@ func ToPrimitiveProperty(propertyName string, typeName Types, index *int) string
 		}
 	default:
 		{
-			_typename = string(typeName)
+			if typeName == "String" {
+				_typename = "string"
+			} else {
+				_typename = string(typeName)
+			}
 			break
 		}
 	}
@@ -348,13 +353,7 @@ func ToPrimitiveProperty(propertyName string, typeName Types, index *int) string
 
 func ToPrimitiveArrayProperty(propertyName string, typeName Types, index *int) string {
 	var output string
-	snakeCasePropertyName, ok := toSnakeCase(propertyName)
-	if ok {
-		output = fmt.Sprintf("\trepeated %s %s = %d [json_name=\"%s\"];", *toPascalCase(string(typeName)), *toCamelCase(propertyName), *index, *snakeCasePropertyName)
-	} else {
-		output = fmt.Sprintf("\trepeated %s %s = %d;", *toPascalCase(string(typeName)), *toCamelCase(propertyName), *index)
-	}
-	*index += 1
+	output = fmt.Sprintf("\trepeated %s", strings.TrimPrefix(ToPrimitiveProperty(propertyName, typeName, index), "\t"))
 	return output
 }
 
