@@ -76,6 +76,7 @@ const (
 	ARRAY   Types = "array"
 	BOOLEAN Types = "boolean"
 	NULL    Types = "null"
+	ANY     Types = "Any"
 )
 
 type PropertyType int
@@ -169,7 +170,7 @@ func (properties Properties) ToField(root map[string]Properties, propertyName st
 		}
 	case UNKOWN_ARRAY_TYPE:
 		{
-			return ToRefArrayProperty(propertyName, "any", index)
+			return ToRefArrayProperty(propertyName, "google.protobuf.Any", index)
 		}
 	case REF_ARRAY_TYPE:
 		{
@@ -349,9 +350,9 @@ func ToPrimitiveArrayProperty(propertyName string, typeName Types, index *int) s
 	var output string
 	snakeCasePropertyName, ok := toSnakeCase(propertyName)
 	if ok {
-		output = fmt.Sprintf("\trepeated %s %s = %d [json_name=\"%s\"];", typeName, *toCamelCase(propertyName), *index, *snakeCasePropertyName)
+		output = fmt.Sprintf("\trepeated %s %s = %d [json_name=\"%s\"];", *toPascalCase(string(typeName)), *toCamelCase(propertyName), *index, *snakeCasePropertyName)
 	} else {
-		output = fmt.Sprintf("\trepeated %s %s = %d;", typeName, *toCamelCase(propertyName), *index)
+		output = fmt.Sprintf("\trepeated %s %s = %d;", *toPascalCase(string(typeName)), *toCamelCase(propertyName), *index)
 	}
 	*index += 1
 	return output
@@ -458,6 +459,8 @@ func fixString(str string) *string {
 	output = strings.ReplaceAll(output, "#", "_")
 	output = strings.ReplaceAll(output, " ", "_")
 	output = strings.ReplaceAll(output, "-", "_")
+	output = strings.ReplaceAll(output, "/", "_")
+	output = strings.ReplaceAll(output, ".", "_")
 	return &output
 }
 
@@ -479,6 +482,9 @@ func toCamelCase(str string) *string {
 }
 
 func toPascalCase(str string) *string {
+	if strings.Contains(str, ".") {
+		return &str
+	}
 	fixedStr := fixString(str)
 	var output string
 	if fixedStr == nil {
