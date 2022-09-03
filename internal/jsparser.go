@@ -273,7 +273,7 @@ func ToEnum(enumName string, enumValue []string, duplicateCheck DuplicateCheck) 
 	for index, value := range enumValue {
 		fixedValue := *fixString(value)
 		buffer.WriteString("\t")
-		buffer.WriteString(fmt.Sprintf("%s_%s", *_enumName, fixedValue))
+		buffer.WriteString(strings.ToUpper(fmt.Sprintf("%s_%s", *_enumName, fixedValue)))
 		buffer.WriteString(" ")
 		buffer.WriteString("=")
 		buffer.WriteString(" ")
@@ -287,13 +287,35 @@ func ToEnum(enumName string, enumValue []string, duplicateCheck DuplicateCheck) 
 }
 
 const UNION_TEMPLATE = `
-	oneof _$NAME$_Union {
+	oneof _$NAME$__union {
 _$VALUE$_
 	}
 `
 
 func ToUnionProperty(root map[string]Properties, unionName string, unionValue []*Properties, index *int, nestedObjectHandler NestedObjectHandler) string {
 	buffer := bytes.NewBufferString("")
+	if len(unionValue) == 2 {
+		isOptional := false
+		var _value *Properties
+		for _, value := range unionValue {
+			if value.Type == NULL {
+				isOptional = true
+			} else {
+				_value = value
+			}
+
+		}
+		if isOptional {
+			_type := string(_value.Type)
+			if _value.Type == NONE {
+				_type = _value.GetRefType(root)
+			}
+			if len(_type) == 0 {
+				panic("Unions without types or formatted unions are not supported by J2P")
+			}
+			return fmt.Sprintf("\toptional %s", strings.TrimLeft(_value.ToField(root, fmt.Sprintf("%s_%s", *toCamelCase(unionName), *toCamelCase(_type)), index, nestedObjectHandler), "\t"))
+		}
+	}
 	for _, value := range unionValue {
 		buffer.WriteString("\t")
 		_type := string(value.Type)
@@ -303,11 +325,11 @@ func ToUnionProperty(root map[string]Properties, unionName string, unionValue []
 		if len(_type) == 0 {
 			panic("Unions without types or formatted unions are not supported by J2P")
 		}
-		buffer.WriteString(value.ToField(root, fmt.Sprintf("%s%s", *toPascalCase(unionName), *toPascalCase(_type)), index, nestedObjectHandler))
+		buffer.WriteString(value.ToField(root, fmt.Sprintf("%s_%s", *toCamelCase(unionName), *toCamelCase(_type)), index, nestedObjectHandler))
 		buffer.WriteString("\n")
 	}
 	renderedStr := UNION_TEMPLATE
-	renderedStr = strings.Replace(renderedStr, "_$NAME$_", unionName, 1)
+	renderedStr = strings.Replace(renderedStr, "_$NAME$_", *toCamelCase(unionName), 1)
 	renderedStr = strings.Replace(renderedStr, "_$VALUE$_", buffer.String(), 1)
 	return renderedStr
 }
@@ -329,6 +351,10 @@ func ToPrimitiveProperty(propertyName string, typeName Types, index *int) string
 		{
 			_typename = "bool"
 			break
+		}
+	case NULL:
+		{
+			_typename = "optional google.protobuf.Any"
 		}
 	default:
 		{
@@ -421,8 +447,6 @@ package _$PACKAGE$_;
 
 import "google/protobuf/any.proto";
 
-message null {}
-
 `
 
 func (rcvr DefaultJsonSchemaParser) Parse(packageName string) []string {
@@ -514,7 +538,14 @@ func toSnakeCase(str string) (*string, bool) {
 	}
 	isConverted := false
 	isPrevNum := false
+	isPrevUnderline := false
 	for index, value := range _str {
+		if value == '_' {
+			isConverted = true
+			isPrevUnderline = true
+			output.WriteString(strings.ToLower(string(value)))
+			continue
+		}
 		if unicode.IsUpper(rune(value)) {
 			if index != 0 {
 				output.WriteString("_")
@@ -542,6 +573,9 @@ func toSnakeCase(str string) (*string, bool) {
 			isPrevNum = false
 			output.WriteString(strings.ToLower(string(value)))
 			continue
+		}
+		if isPrevUnderline {
+			isPrevUnderline = false
 		}
 		output.WriteByte(value)
 	}
