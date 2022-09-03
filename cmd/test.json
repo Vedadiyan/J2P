@@ -69,10 +69,7 @@
                         "height"
                     ]
                 },
-                "warehouseLocation": {
-                    "description": "Coordinates of the warehouse where the product is located.",
-                    "$ref": "https://example.com/geographical-location.schema.json"
-                },
+
                 "storage": {
                     "type": "object",
                     "oneOf": [
@@ -103,20 +100,7 @@
                     "type": "string",
                     "pattern": "^/dev/[^/]+(/[^/]+)*$"
                 },
-                "server": {
-                    "type": "string",
-                    "oneOf": [
-                        {
-                            "format": "hostname"
-                        },
-                        {
-                            "format": "ipv4"
-                        },
-                        {
-                            "format": "ipv6"
-                        }
-                    ]
-                },
+
                 "sizeInMB": {
                     "type": "integer",
                     "minimum": 16,
